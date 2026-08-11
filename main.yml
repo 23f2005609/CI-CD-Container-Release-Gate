@@ -1,0 +1,63 @@
+name: TDS GA7 Release Gate
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-endpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install Flask==3.0.0
+
+      - name: TDS identity: 23f2005609@ds.study.iitm.ac.in
+        run: echo "Verifying identity for IITM grading..."
+
+      - name: Test Release Gate Implementation
+        run: |
+          # Start the Flask app in the background
+          python app.py &
+          sleep 3 # Wait for the server to initialize
+          
+          # Test with a perfectly safe payload
+          RESPONSE=$(curl -s -X POST http://127.0.0.1:8080/release-gate \
+            -H "Content-Type: application/json" \
+            -d '{
+              "target": "preview",
+              "event": "push",
+              "ref": "refs/heads/main",
+              "workflow": {
+                "trigger": "push",
+                "permissions": {"contents":"read", "packages":"write", "id-token":"none"},
+                "testsPassed": true,
+                "matrixComplete": true,
+                "failFast": false,
+                "actions": [{"owner":"actions", "name":"checkout", "ref":"v4"}]
+              },
+              "image": {
+                "multiStage": true,
+                "runsAsRoot": false,
+                "secretMode": "none",
+                "criticalVulnerabilities": 0,
+                "digestPinned": true
+              }
+            }')
+          
+          echo "Response: $RESPONSE"
+          if [[ "$RESPONSE" == *'"decision":"promote"'* ]]; then
+            echo "Test passed!"
+            exit 0
+          else
+            echo "Test failed!"
+            exit 1
+          fi
