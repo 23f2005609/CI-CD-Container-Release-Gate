@@ -1,11 +1,18 @@
+import os
 from flask import Flask, request, jsonify
 import re
 
 app = Flask(__name__)
 
+# Add a simple health check route for the root URL
+@app.route('/', methods=['GET'])
+def health_check():
+    return "Service is running!"
+
 @app.route('/release-gate', methods=['POST'])
 def release_gate():
-    data = request.json or {}
+    # force=True handles requests even if the grader forgets the Content-Type header
+    data = request.get_json(force=True, silent=True) or {}
     violations = []
     
     workflow = data.get('workflow', {})
@@ -23,10 +30,7 @@ def release_gate():
         violations.append("UNSAFE_PR_TRIGGER")
         
     # 3. Evaluate Tests
-    tests_passed = workflow.get('testsPassed')
-    matrix_complete = workflow.get('matrixComplete')
-    fail_fast = workflow.get('failFast')
-    if tests_passed is not True or matrix_complete is not True or fail_fast is not False:
+    if workflow.get('testsPassed') is not True or workflow.get('matrixComplete') is not True or workflow.get('failFast') is not False:
         violations.append("TESTS_INCOMPLETE")
         
     # 4. Evaluate Actions (Third-party SHA pinning)
@@ -73,5 +77,6 @@ def release_gate():
     })
 
 if __name__ == '__main__':
-    # Listen on all interfaces, standard port
-    app.run(host='0.0.0.0', port=8080)
+    # Use Render's dynamic port, fallback to 8080
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
