@@ -9,7 +9,7 @@ app = Flask(__name__)
 def health_check():
     return "Service is running!"
 
-@app.route('/release-gate', methods=['POST'])
+@app.route('/release-gate', strict_slashes=False, methods=['POST'])
 def release_gate():
     # force=True handles requests even if the grader forgets the Content-Type header
     data = request.get_json(force=True, silent=True) or {}
